@@ -185,6 +185,10 @@ func (s *stateObject) GetState(db Database, key common.Hash) common.Hash {
 
 // GetCommittedState retrieves a value from the committed account storage trie.
 func (s *stateObject) GetCommittedState(db Database, key common.Hash) common.Hash {
+	if s.db.ReplayDb != nil {
+		s.db.ReplayDb.SetCurrentCodeHash(&s.data.CodeHash)
+		db = s.db.ReplayDb
+	}
 	// If the fake storage is set, only lookup the state here(in the debugging mode)
 	if s.fakeStorage != nil {
 		return s.fakeStorage[key]

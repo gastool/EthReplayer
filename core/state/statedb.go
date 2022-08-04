@@ -18,8 +18,11 @@
 package state
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum/research/database"
+	"github.com/ethereum/go-ethereum/research/model"
 	"math/big"
 	"sort"
 	"time"
@@ -61,6 +64,12 @@ func (n *proofList) Delete(key []byte) error {
 // nested states. It's the general query interface to retrieve:
 // * Contracts
 // * Accounts
+
+type ReplayDB interface {
+	GetStateObject(addr common.Address, bt model.BtIndex) *types.StateAccount
+	ContextDatabase
+}
+
 type StateDB struct {
 	db         Database
 	prefetcher *triePrefetcher
@@ -125,6 +134,9 @@ type StateDB struct {
 	StorageUpdated int
 	AccountDeleted int
 	StorageDeleted int
+
+	bt       model.BtIndex
+	ReplayDb ReplayDB
 }
 
 // New creates a new state from a given trie.
@@ -451,6 +463,17 @@ func (s *StateDB) Suicide(addr common.Address) bool {
 	return true
 }
 
+func (s *StateDB) SetBtIndex(blockNum uint64, txIndex int) {
+	s.bt = model.BtIndex{
+		BlockNumber: uint32(blockNum),
+		TxIndex:     uint16(txIndex),
+	}
+	if s.ReplayDb != nil {
+		s.ReplayDb.SetBtIndex(s.bt)
+		s.db = s.ReplayDb
+	}
+}
+
 //
 // Setting, updating & deleting state object methods.
 //
@@ -537,21 +560,28 @@ func (s *StateDB) getDeletedStateObject(addr common.Address) *stateObject {
 	// If snapshot unavailable or reading from it failed, load from the database
 	if data == nil {
 		start := time.Now()
-		enc, err := s.trie.TryGet(addr.Bytes())
-		if metrics.EnabledExpensive {
-			s.AccountReads += time.Since(start)
-		}
-		if err != nil {
-			s.setError(fmt.Errorf("getDeleteStateObject (%x) error: %v", addr.Bytes(), err))
-			return nil
-		}
-		if len(enc) == 0 {
-			return nil
-		}
-		data = new(types.StateAccount)
-		if err := rlp.DecodeBytes(enc, data); err != nil {
-			log.Error("Failed to decode state object", "addr", addr, "err", err)
-			return nil
+		if s.ReplayDb != nil {
+			data = database.GetStateAccount(s.bt, addr)
+			if data == nil {
+				return nil
+			}
+		} else {
+			enc, err := s.trie.TryGet(addr.Bytes())
+			if metrics.EnabledExpensive {
+				s.AccountReads += time.Since(start)
+			}
+			if err != nil {
+				s.setError(fmt.Errorf("getDeleteStateObject (%x) error: %v", addr.Bytes(), err))
+				return nil
+			}
+			if len(enc) == 0 {
+				return nil
+			}
+			data = new(types.StateAccount)
+			if err := rlp.DecodeBytes(enc, data); err != nil {
+				log.Error("Failed to decode state object", "addr", addr, "err", err)
+				return nil
+			}
 		}
 	}
 	// Insert into the live set
@@ -846,10 +876,35 @@ func (s *StateDB) IntermediateRoot(deleteEmptyObjects bool) common.Hash {
 	// the account prefetcher. Instead, let's process all the storage updates
 	// first, giving the account prefeches just a few more milliseconds of time
 	// to pull useful data from disk.
+
+	storages := make(map[*stateObject]Storage)
+
 	for addr := range s.stateObjectsPending {
 		if obj := s.stateObjects[addr]; !obj.deleted {
+			storages[obj] = obj.pendingStorage.Copy()
 			obj.updateRoot(s.db)
 		}
+	}
+	for addr := range s.stateObjectsPending {
+		obj := s.stateObjects[addr]
+		var root *common.Hash
+		var codeHash *[]byte
+		if obj.deleted || bytes.Equal(obj.CodeHash(), emptyCodeHash) {
+			root = nil
+			codeHash = nil
+		} else {
+			root = &obj.data.Root
+			codeHash = &obj.data.CodeHash
+			database.SaveCode(obj.code, *codeHash)
+			database.SaveStorage(storages[obj], *codeHash, obj.addrHash, s.bt)
+		}
+		database.SaveAccountState(&model.AccountState{
+			Nonce:    obj.Nonce(),
+			Balance:  obj.Balance(),
+			Root:     root,
+			CodeHash: codeHash,
+			Deleted:  obj.deleted,
+		}, obj.address, s.bt)
 	}
 	// Now we're about to start to write changes to the trie. The trie is so far
 	// _untouched_. We can check with the prefetcher, if it can give us a trie
