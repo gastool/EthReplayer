@@ -2,6 +2,7 @@ package replay
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
@@ -13,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/research/database"
 	"github.com/ethereum/go-ethereum/research/model"
+	bolt "go.etcd.io/bbolt"
 	"log"
 	"math/big"
 )
@@ -23,6 +25,21 @@ func NewReplayStateDB() *state.StateDB {
 	rb := state.NewReplayDB(sdb.TrieDB())
 	statedb.ReplayDb = rb
 	return statedb
+}
+
+func ReplayAddr(address common.Address) {
+	database.DataBases[database.Account].View(func(tx *bolt.Tx) error {
+		c := tx.Bucket(address.Bytes())
+		if c == nil {
+			return errors.New("no such address")
+		}
+		cur := c.Cursor()
+		for k, _ := cur.First(); k != nil; k, _ = cur.Next() {
+			bt := model.KeyToBtIndex(k)
+			Replay(uint64(bt.BlockNumber), int(bt.TxIndex))
+		}
+		return nil
+	})
 }
 
 func Replay(block uint64, txIndex int) {
