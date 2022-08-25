@@ -6,6 +6,8 @@ import (
 	bolt "go.etcd.io/bbolt"
 	"io/ioutil"
 	"os"
+	"sync/atomic"
+	"time"
 )
 
 type DataType int
@@ -44,11 +46,22 @@ func init() {
 		if err != nil {
 			panic(err)
 		}
+		db.MaxBatchSize = 5000
+		db.MaxBatchDelay = 500 * time.Millisecond
 		DataBases[i] = db
 	}
 }
 
 func Close() {
+	for {
+		tn := atomic.LoadInt64(&saveTask)
+		if tn > 0 {
+			log.Info("database closing", "saveTask", tn)
+			time.Sleep(1 * time.Second)
+		} else {
+			break
+		}
+	}
 	for _, v := range DataBases {
 		v.Close()
 	}
