@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/research/model"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
+	lru "github.com/hashicorp/golang-lru"
 )
 
 type ContextDatabase interface {
@@ -25,13 +26,17 @@ type RepDB struct {
 	db              *trie.Database
 	currentCodeHash *[]byte
 	bt              model.BtIndex
-	cacheTrie       map[common.Hash]*CacheTrie
+	cacheTrie       *lru.Cache
 }
 
 func NewReplayDB(db *trie.Database) *RepDB {
+	cache, e := lru.New(100000)
+	if e != nil {
+		panic(e)
+	}
 	return &RepDB{
 		db:        db,
-		cacheTrie: make(map[common.Hash]*CacheTrie),
+		cacheTrie: cache,
 	}
 }
 
@@ -44,7 +49,8 @@ func (r *RepDB) OpenTrie(root common.Hash) (Trie, error) {
 }
 
 func (r *RepDB) OpenStorageTrie(addrHash, root common.Hash) (Trie, error) {
-	if v, ok := r.cacheTrie[addrHash]; ok {
+	if value, ok := r.cacheTrie.Get(addrHash); ok {
+		v := value.(CacheTrie)
 		if v.bt.BlockNumber == r.bt.BlockNumber && v.bt.TxIndex == r.bt.TxIndex {
 			return v.trie, nil
 		}
@@ -62,10 +68,10 @@ func (r *RepDB) OpenStorageTrie(addrHash, root common.Hash) (Trie, error) {
 	if tr.Hash() != root {
 		panic("invalid storage")
 	}
-	r.cacheTrie[addrHash] = &CacheTrie{
+	r.cacheTrie.Add(addrHash, &CacheTrie{
 		bt:   r.bt,
 		trie: tr,
-	}
+	})
 	return tr, nil
 }
 
