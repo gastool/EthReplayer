@@ -22,7 +22,8 @@ import (
 func NewReplayStateDB() *state.StateDB {
 	sdb := state.NewDatabase(rawdb.NewMemoryDatabase())
 	statedb, _ := state.New(common.Hash{}, sdb, nil)
-	rb := state.NewReplayDB(sdb.TrieDB())
+	//rb := state.NewReplayDB(sdb.TrieDB())
+	rb := state.NewReplayLazyDB(sdb.TrieDB())
 	statedb.ReplayDb = rb
 	return statedb
 }

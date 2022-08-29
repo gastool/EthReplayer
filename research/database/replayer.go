@@ -106,6 +106,36 @@ func GetStorage(bt model.BtIndex, codeHash []byte, addrHash common.Hash) map[com
 	}
 	return storage
 }
+
+func GetStorageValue(bt model.BtIndex, codeHash []byte, addrHash common.Hash, key []byte) []byte {
+	sk2 := bt.ToSearchKey(nil)
+	key2 := common.TrimLeftZeroes(key)
+	if len(key2) == 0 {
+		key2 = []byte{0}
+	}
+	var value []byte
+	DataBases[Code].View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(codeHash)
+		if b != nil {
+			storageAddr := crypto.Keccak256Hash(codeHash, addrHash[:])
+			b2 := b.Bucket(storageAddr[:])
+			if b2 != nil {
+				b3 := b2.Bucket(key2)
+				if b3 == nil {
+					return nil
+				}
+				k2, v := b3.Cursor().Seek(sk2)
+				if k2 != nil {
+					value = v
+					return nil
+				}
+			}
+		}
+		return nil
+	})
+	return value
+}
+
 func GetContractCode(codeHash []byte) ([]byte, error) {
 	var bs []byte
 	return bs, DataBases[Code].View(func(tx *bolt.Tx) error {

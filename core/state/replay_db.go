@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/research/database"
 	"github.com/ethereum/go-ethereum/research/model"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -15,6 +16,7 @@ type ContextDatabase interface {
 	Database
 	SetBtIndex(bt model.BtIndex)
 	SetCurrentCodeHash(codeHash *[]byte)
+	IsLazy() bool
 }
 
 type CacheTrie struct {
@@ -22,11 +24,61 @@ type CacheTrie struct {
 	trie Trie
 }
 
+type LazyTrie struct {
+	bt       model.BtIndex
+	codeHash []byte
+	addrHash common.Hash
+}
+
+func (l *LazyTrie) SetContext(bt model.BtIndex, codeHash []byte, addrHash common.Hash) {
+	l.bt = bt
+	l.codeHash = codeHash
+	l.addrHash = addrHash
+}
+
+func (l *LazyTrie) GetKey([]byte) []byte {
+	return nil
+}
+
+func (l *LazyTrie) TryGet(key []byte) ([]byte, error) {
+	value := database.GetStorageValue(l.bt, l.codeHash, l.addrHash, key)
+	return value, nil
+}
+
+func (l *LazyTrie) TryUpdateAccount(key []byte, account *types.StateAccount) error {
+	return nil
+
+}
+func (l *LazyTrie) TryUpdate(key, value []byte) error {
+	return nil
+
+}
+func (l *LazyTrie) TryDelete(key []byte) error {
+	return nil
+
+}
+func (l *LazyTrie) Hash() common.Hash {
+	return common.Hash{}
+
+}
+func (l *LazyTrie) Commit(onleaf trie.LeafCallback) (common.Hash, int, error) {
+	return common.Hash{}, 0, nil
+
+}
+func (l *LazyTrie) NodeIterator(startKey []byte) trie.NodeIterator {
+	return nil
+
+}
+func (l *LazyTrie) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWriter) error {
+	return nil
+}
+
 type RepDB struct {
 	db              *trie.Database
 	currentCodeHash *[]byte
 	bt              model.BtIndex
 	cacheTrie       *lru.Cache
+	lazyStorageDB   bool
 }
 
 func NewReplayDB(db *trie.Database) *RepDB {
@@ -40,6 +92,13 @@ func NewReplayDB(db *trie.Database) *RepDB {
 	}
 }
 
+func NewReplayLazyDB(db *trie.Database) *RepDB {
+	return &RepDB{
+		db:            db,
+		lazyStorageDB: true,
+	}
+}
+
 func (r *RepDB) OpenTrie(root common.Hash) (Trie, error) {
 	tr, err := trie.NewSecure(common.Hash{}, root, r.db)
 	if err != nil {
@@ -47,8 +106,16 @@ func (r *RepDB) OpenTrie(root common.Hash) (Trie, error) {
 	}
 	return tr, nil
 }
+func (r *RepDB) IsLazy() bool {
+	return r.lazyStorageDB
+}
 
 func (r *RepDB) OpenStorageTrie(addrHash, root common.Hash) (Trie, error) {
+	if r.lazyStorageDB {
+		return &LazyTrie{
+			addrHash: addrHash,
+		}, nil
+	}
 	if value, ok := r.cacheTrie.Get(addrHash); ok {
 		v := value.(CacheTrie)
 		if v.bt.BlockNumber == r.bt.BlockNumber && v.bt.TxIndex == r.bt.TxIndex {

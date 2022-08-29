@@ -163,6 +163,9 @@ func (s *stateObject) getTrie(db Database) Trie {
 				s.trie, _ = db.OpenStorageTrie(s.addrHash, common.Hash{})
 				s.setError(fmt.Errorf("can't create storage trie: %v", err))
 			}
+			if s.db.ReplayDb != nil && s.db.ReplayDb.IsLazy() {
+				s.trie.(*LazyTrie).SetContext(s.db.bt, s.data.CodeHash, s.addrHash)
+			}
 		}
 	}
 	return s.trie
@@ -185,9 +188,14 @@ func (s *stateObject) GetState(db Database, key common.Hash) common.Hash {
 
 // GetCommittedState retrieves a value from the committed account storage trie.
 func (s *stateObject) GetCommittedState(db Database, key common.Hash) common.Hash {
+	lazy := false
 	if s.db.ReplayDb != nil {
-		s.db.ReplayDb.SetCurrentCodeHash(&s.data.CodeHash)
-		db = s.db.ReplayDb
+		if !s.db.ReplayDb.IsLazy() {
+			s.db.ReplayDb.SetCurrentCodeHash(&s.data.CodeHash)
+			db = s.db.ReplayDb
+		} else {
+			lazy = true
+		}
 	}
 	// If the fake storage is set, only lookup the state here(in the debugging mode)
 	if s.fakeStorage != nil {
@@ -235,11 +243,15 @@ func (s *stateObject) GetCommittedState(db Database, key common.Hash) common.Has
 	}
 	var value common.Hash
 	if len(enc) > 0 {
-		_, content, _, err := rlp.Split(enc)
-		if err != nil {
-			s.setError(err)
+		if !lazy {
+			_, content, _, err := rlp.Split(enc)
+			if err != nil {
+				s.setError(err)
+			}
+			value.SetBytes(content)
+		} else {
+			value.SetBytes(enc)
 		}
-		value.SetBytes(content)
 	}
 	s.originStorage[key] = value
 	return value
