@@ -46,8 +46,8 @@ func init() {
 		if err != nil {
 			panic(err)
 		}
-		db.MaxBatchSize = 5000
-		db.MaxBatchDelay = 500 * time.Millisecond
+		db.MaxBatchSize = 100000
+		db.MaxBatchDelay = 30 * time.Second
 		DataBases[i] = db
 	}
 }
@@ -57,7 +57,7 @@ func Close() {
 		tn := atomic.LoadInt64(&saveTask)
 		if tn > 0 {
 			log.Info("database closing", "saveTask", tn)
-			time.Sleep(1 * time.Second)
+			time.Sleep(10 * time.Second)
 		} else {
 			break
 		}
