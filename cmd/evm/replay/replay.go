@@ -6,7 +6,7 @@ import (
 	"strconv"
 )
 
-var replayCommand = cli.Command{
+var ReplayCommand = cli.Command{
 	Action:      replayCmd,
 	Name:        "replay",
 	Usage:       "replay blockNumber txIndex",
