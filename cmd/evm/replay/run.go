@@ -43,7 +43,7 @@ func ReplayAddr(address common.Address) {
 	})
 }
 
-func Replay(block uint64, txIndex int) {
+func Replay(block uint64, txIndex int) error {
 	var (
 		chainConfig *params.ChainConfig
 		statedb     = NewReplayStateDB()
@@ -72,7 +72,7 @@ func Replay(block uint64, txIndex int) {
 	txInfo := database.GetTxInfo(bt)
 	if be == nil || txInfo == nil {
 		//log.Printf("invalid blockNumber:%d or tx:%d", block, txIndex)
-		return
+		return fmt.Errorf("invalid blockNumber:%d or tx:%d", block, txIndex)
 	}
 	gaspool.AddGas(be.GasLimit)
 	vmContext := vm.BlockContext{
@@ -95,7 +95,7 @@ func Replay(block uint64, txIndex int) {
 	evm := vm.NewEVM(vmContext, txContext, statedb, chainConfig, vmConfig)
 	result, err := core.ApplyMessage(evm, msg, gaspool)
 	if err != nil {
-		log.Println("")
+		log.Println("[error]", block, txIndex, err)
 	}
 	status := uint64(0)
 	if result.Failed() {
@@ -110,8 +110,7 @@ func Replay(block uint64, txIndex int) {
 	hash := model.GenerateExecuteHash(statedb.GetLogs(txInfo.Hash, be.BlockHash), result.UsedGas, status, contractAddr)
 	if !bytes.Equal(hash[:], txInfo.ResultHash[:]) {
 		//fmt.Println(fmt.Sprintf("error at %d %d %s", block, txIndex, txInfo.Hash.String()))
-		panic(fmt.Sprintf("error at %d %d %s", block, txIndex, txInfo.Hash.String()))
-	} else {
-		fmt.Println(fmt.Sprintf("pass %d %d", block, txIndex))
+		return fmt.Errorf("error at %d %d %s", block, txIndex, txInfo.Hash.String())
 	}
+	return nil
 }
