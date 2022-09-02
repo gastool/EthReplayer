@@ -48,7 +48,7 @@ func TestGetStorage(t *testing.T) {
 	if len(s.CodeHash) == 0 {
 		panic("")
 	}
-	storage := GetStorage(bt, s.CodeHash, common.HexToAddress(addr).Hash())
+	storage := GetStorage(bt, s.CodeHash, common.HexToAddress(addr).Hash(), false)
 	for k, v := range storage {
 		fmt.Println(hex.EncodeToString(k[:]), hex.EncodeToString(v[:]))
 	}

@@ -36,7 +36,7 @@ func TestStorageVerify(t *testing.T) {
 					continue
 				}
 				storageTrie, err := trie.NewSecure(common.Hash{}, EmptyRoot, triedb)
-				sm := GetStorage(bt, *state.CodeHash, crypto.Keccak256Hash(k))
+				sm := GetStorage(bt, *state.CodeHash, crypto.Keccak256Hash(k), false)
 				for k, v := range sm {
 					if (v == common.Hash{}) {
 						err := storageTrie.TryDelete(k[:])
@@ -87,7 +87,7 @@ func TestAccountVerify(t *testing.T) {
 					continue
 				}
 				storageTrie, err := trie.NewSecure(common.Hash{}, EmptyRoot, triedb)
-				sm := GetStorage(bt, *state.CodeHash, crypto.Keccak256Hash(k))
+				sm := GetStorage(bt, *state.CodeHash, crypto.Keccak256Hash(k), false)
 				for k, v := range sm {
 					if (v == common.Hash{}) {
 						err := storageTrie.TryDelete(k[:])
@@ -140,7 +140,7 @@ func TestStorageVerifySingle(t *testing.T) {
 			}
 			storageTrie, err := trie.NewSecure(common.Hash{}, EmptyRoot, triedb)
 			t.Log(bt)
-			sm := GetStorage(bt, *state.CodeHash, crypto.Keccak256Hash(addr[:]))
+			sm := GetStorage(bt, *state.CodeHash, crypto.Keccak256Hash(addr[:]), false)
 			for k, v := range sm {
 				t.Log(k.String(), v.String())
 				if (v == common.Hash{}) {

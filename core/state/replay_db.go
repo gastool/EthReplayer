@@ -123,7 +123,7 @@ func (r *RepDB) OpenStorageTrie(addrHash, root common.Hash) (Trie, error) {
 		}
 	}
 	tr, _ := trie.NewSecure(common.Hash{}, common.Hash{}, r.db)
-	storageMap := database.GetStorage(r.bt, *r.currentCodeHash, addrHash)
+	storageMap := database.GetStorage(r.bt, *r.currentCodeHash, addrHash, true)
 	for k, v := range storageMap {
 		if v == (common.Hash{}) {
 			tr.TryDelete(k[:])

@@ -77,10 +77,13 @@ func GetTxInfo(bt model.BtIndex) *model.TxInfo {
 	return info
 }
 
-func GetStorage(bt model.BtIndex, codeHash []byte, addrHash common.Hash) map[common.Hash]common.Hash {
+func GetStorage(bt model.BtIndex, codeHash []byte, addrHash common.Hash, search bool) map[common.Hash]common.Hash {
 	storage := make(map[common.Hash]common.Hash)
-	//sk2 := bt.ToSortKey(nil)
+
 	sk2 := bt.ToSearchKey(nil)
+	if !search {
+		sk2 = bt.ToSortKey(nil)
+	}
 	err := DataBases[Code].View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(codeHash)
 		if b != nil {
