@@ -29,6 +29,8 @@ type DBConfig struct {
 	Names []string `json:"names"`
 }
 
+var MaxBatchDelay = 30 * time.Second
+
 func init() {
 	bs, err := ioutil.ReadFile("config.json")
 	if err != nil {
@@ -47,21 +49,22 @@ func init() {
 			panic(err)
 		}
 		db.MaxBatchSize = 100000
-		db.MaxBatchDelay = 30 * time.Second
+		db.MaxBatchDelay = MaxBatchDelay
 		DataBases[i] = db
 	}
 }
 
 func Close() {
 	for {
-		tn := atomic.LoadInt64(&saveTask)
-		if tn > 0 {
-			log.Info("database closing", "saveTask", tn)
-			time.Sleep(10 * time.Second)
+		pt := atomic.LoadInt64(&parallelTask)
+		if pt > 0 {
+			log.Info("database closing", "parallelTask", pt)
+			time.Sleep(5 * time.Second)
 		} else {
 			break
 		}
 	}
+	time.Sleep(5 * MaxBatchDelay) // Wait batch commit
 	for _, v := range DataBases {
 		v.Close()
 	}

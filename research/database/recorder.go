@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 )
 
-var saveTask = int64(0)
+var parallelTask = int64(0)
 
 func SaveTxInfo(info *model.TxInfo, index *model.BtIndex) {
 	value, err := rlp.EncodeToBytes(info)
@@ -18,8 +18,8 @@ func SaveTxInfo(info *model.TxInfo, index *model.BtIndex) {
 	}
 	key := index.AllToByte()
 	go func() {
-		atomic.AddInt64(&saveTask, 1)
-		defer atomic.AddInt64(&saveTask, -1)
+		atomic.AddInt64(&parallelTask, 1)
+		defer atomic.AddInt64(&parallelTask, -1)
 		err = DataBases[Info].Batch(func(tx *bolt.Tx) error {
 			c, err := tx.CreateBucketIfNotExists([]byte("tx"))
 			if err != nil {
@@ -40,8 +40,8 @@ func SaveBlockInfo(info *model.BlockInfo, index model.BtIndex) {
 	}
 	key := index.BlockToByte()
 	go func() {
-		atomic.AddInt64(&saveTask, 1)
-		defer atomic.AddInt64(&saveTask, -1)
+		atomic.AddInt64(&parallelTask, 1)
+		defer atomic.AddInt64(&parallelTask, -1)
 		e := DataBases[Info].Batch(func(tx *bolt.Tx) error {
 			c, err := tx.CreateBucketIfNotExists([]byte("block"))
 			if err != nil {
@@ -62,8 +62,8 @@ func SaveAccountState(state *model.AccountState, addr common.Address, index mode
 	}
 	key := index.ToSortKey(nil)
 	go func() {
-		atomic.AddInt64(&saveTask, 1)
-		defer atomic.AddInt64(&saveTask, -1)
+		atomic.AddInt64(&parallelTask, 1)
+		defer atomic.AddInt64(&parallelTask, -1)
 		err = DataBases[Account].Batch(func(tx *bolt.Tx) error {
 			c, err := tx.CreateBucketIfNotExists(addr.Bytes())
 			if err != nil {
@@ -79,8 +79,8 @@ func SaveAccountState(state *model.AccountState, addr common.Address, index mode
 
 func SaveCode(code []byte, codeHash []byte) {
 	go func() {
-		atomic.AddInt64(&saveTask, 1)
-		defer atomic.AddInt64(&saveTask, -1)
+		atomic.AddInt64(&parallelTask, 1)
+		defer atomic.AddInt64(&parallelTask, -1)
 		err := DataBases[Code].Update(func(tx *bolt.Tx) error {
 			c, err := tx.CreateBucketIfNotExists(codeHash)
 			if err != nil {
@@ -100,8 +100,8 @@ func SaveCode(code []byte, codeHash []byte) {
 
 func SaveStorage(storageChange map[common.Hash]common.Hash, codeHash []byte, addrHash common.Hash, index model.BtIndex) {
 	go func() {
-		atomic.AddInt64(&saveTask, 1)
-		defer atomic.AddInt64(&saveTask, -1)
+		atomic.AddInt64(&parallelTask, 1)
+		defer atomic.AddInt64(&parallelTask, -1)
 		err := DataBases[Code].Batch(func(tx *bolt.Tx) error {
 			b1, err := tx.CreateBucketIfNotExists(codeHash[:])
 			if err != nil {
