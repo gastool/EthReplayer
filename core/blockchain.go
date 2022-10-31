@@ -42,6 +42,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/research/database"
 	"github.com/ethereum/go-ethereum/trie"
 	lru "github.com/hashicorp/golang-lru"
 )
@@ -864,6 +865,7 @@ func (bc *BlockChain) Stop() {
 		triedb := bc.stateCache.TrieDB()
 		triedb.SaveCache(bc.cacheConfig.TrieCleanJournal)
 	}
+	database.Close()
 	log.Info("Blockchain stopped")
 }
 

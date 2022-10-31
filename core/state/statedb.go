@@ -18,8 +18,11 @@
 package state
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum/research/database"
+	"github.com/ethereum/go-ethereum/research/model"
 	"math/big"
 	"sort"
 	"time"
@@ -61,6 +64,12 @@ func (n *proofList) Delete(key []byte) error {
 // nested states. It's the general query interface to retrieve:
 // * Contracts
 // * Accounts
+
+type ReplayDB interface {
+	GetStateObject(addr common.Address, bt model.BtIndex) *types.StateAccount
+	ContextDatabase
+}
+
 type StateDB struct {
 	db         Database
 	prefetcher *triePrefetcher
@@ -125,6 +134,9 @@ type StateDB struct {
 	StorageUpdated int
 	AccountDeleted int
 	StorageDeleted int
+
+	bt       model.BtIndex
+	ReplayDb ReplayDB
 }
 
 // New creates a new state from a given trie.
@@ -410,7 +422,9 @@ func (s *StateDB) SetNonce(addr common.Address, nonce uint64) {
 func (s *StateDB) SetCode(addr common.Address, code []byte) {
 	stateObject := s.GetOrNewStateObject(addr)
 	if stateObject != nil {
-		stateObject.SetCode(crypto.Keccak256Hash(code), code)
+		codeHash := crypto.Keccak256Hash(code)
+		stateObject.SetCode(codeHash, code)
+		database.SaveCode(code, codeHash.Bytes(), stateObject.addrHash, s.bt)
 	}
 }
 
@@ -440,6 +454,7 @@ func (s *StateDB) Suicide(addr common.Address) bool {
 	if stateObject == nil {
 		return false
 	}
+	database.Suicide(stateObject.addrHash, s.bt)
 	s.journal.append(suicideChange{
 		account:     &addr,
 		prev:        stateObject.suicided,
@@ -449,6 +464,17 @@ func (s *StateDB) Suicide(addr common.Address) bool {
 	stateObject.data.Balance = new(big.Int)
 
 	return true
+}
+
+func (s *StateDB) SetBtIndex(blockNum uint64, txIndex int) {
+	s.bt = model.BtIndex{
+		BlockNumber: uint32(blockNum),
+		TxIndex:     uint16(txIndex),
+	}
+	if s.ReplayDb != nil {
+		s.ReplayDb.SetBtIndex(s.bt)
+		s.db = s.ReplayDb
+	}
 }
 
 //
@@ -537,21 +563,28 @@ func (s *StateDB) getDeletedStateObject(addr common.Address) *stateObject {
 	// If snapshot unavailable or reading from it failed, load from the database
 	if data == nil {
 		start := time.Now()
-		enc, err := s.trie.TryGet(addr.Bytes())
-		if metrics.EnabledExpensive {
-			s.AccountReads += time.Since(start)
-		}
-		if err != nil {
-			s.setError(fmt.Errorf("getDeleteStateObject (%x) error: %v", addr.Bytes(), err))
-			return nil
-		}
-		if len(enc) == 0 {
-			return nil
-		}
-		data = new(types.StateAccount)
-		if err := rlp.DecodeBytes(enc, data); err != nil {
-			log.Error("Failed to decode state object", "addr", addr, "err", err)
-			return nil
+		if s.ReplayDb != nil {
+			data = database.GetStateAccount(s.bt, addr)
+			if data == nil {
+				return nil
+			}
+		} else {
+			enc, err := s.trie.TryGet(addr.Bytes())
+			if metrics.EnabledExpensive {
+				s.AccountReads += time.Since(start)
+			}
+			if err != nil {
+				s.setError(fmt.Errorf("getDeleteStateObject (%x) error: %v", addr.Bytes(), err))
+				return nil
+			}
+			if len(enc) == 0 {
+				return nil
+			}
+			data = new(types.StateAccount)
+			if err := rlp.DecodeBytes(enc, data); err != nil {
+				log.Error("Failed to decode state object", "addr", addr, "err", err)
+				return nil
+			}
 		}
 	}
 	// Insert into the live set
@@ -604,8 +637,8 @@ func (s *StateDB) createObject(addr common.Address) (newobj, prev *stateObject) 
 // CreateAccount is called during the EVM CREATE operation. The situation might arise that
 // a contract does the following:
 //
-//   1. sends funds to sha(account ++ (nonce + 1))
-//   2. tx_create(sha(account ++ nonce)) (note that this gets the address of 1)
+//  1. sends funds to sha(account ++ (nonce + 1))
+//  2. tx_create(sha(account ++ nonce)) (note that this gets the address of 1)
 //
 // Carrying over the balance ensures that Ether doesn't disappear.
 func (s *StateDB) CreateAccount(addr common.Address) {
@@ -802,7 +835,26 @@ func (s *StateDB) Finalise(deleteEmptyObjects bool) {
 				delete(s.snapAccounts, obj.addrHash)       // Clear out any previously updated account data (may be recreated via a ressurrect)
 				delete(s.snapStorage, obj.addrHash)        // Clear out any previously updated storage data (may be recreated via a ressurrect)
 			}
+			database.SaveAccountState(&model.AccountState{
+				Nonce:    obj.Nonce(),
+				Balance:  obj.Balance(),
+				CodeHash: nil,
+				Deleted:  true,
+			}, obj.address, s.bt)
 		} else {
+			var codeHash *[]byte
+			if obj.deleted || bytes.Equal(obj.CodeHash(), emptyCodeHash) {
+				codeHash = nil
+			} else {
+				codeHash = &obj.data.CodeHash
+			}
+			database.SaveStorage(obj.dirtyStorage.Copy(), obj.addrHash, s.bt)
+			database.SaveAccountState(&model.AccountState{
+				Nonce:    obj.Nonce(),
+				Balance:  obj.Balance(),
+				CodeHash: codeHash,
+				Deleted:  obj.deleted,
+			}, obj.address, s.bt)
 			obj.finalise(true) // Prefetch slots in the background
 		}
 		s.stateObjectsPending[addr] = struct{}{}

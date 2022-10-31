@@ -19,6 +19,7 @@ package state
 import (
 	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum/research/database"
 
 	"github.com/VictoriaMetrics/fastcache"
 	"github.com/ethereum/go-ethereum/common"
@@ -118,10 +119,14 @@ func NewDatabase(db ethdb.Database) Database {
 // large memory cache.
 func NewDatabaseWithConfig(db ethdb.Database, config *trie.Config) Database {
 	csc, _ := lru.New(codeSizeCacheSize)
+	var cache *fastcache.Cache
+	if !database.ReplayMode {
+		cache = fastcache.New(codeCacheSize)
+	}
 	return &cachingDB{
 		db:            trie.NewDatabaseWithConfig(db, config),
 		codeSizeCache: csc,
-		codeCache:     fastcache.New(codeCacheSize),
+		codeCache:     cache,
 	}
 }
 

@@ -18,6 +18,8 @@ package core
 
 import (
 	"fmt"
+	"github.com/ethereum/go-ethereum/research/database"
+	"github.com/ethereum/go-ethereum/research/model"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -79,16 +81,43 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 			return nil, nil, 0, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)
 		}
 		statedb.Prepare(tx.Hash(), i)
+		statedb.SetBtIndex(block.NumberU64(), i)
 		receipt, err := applyTransaction(msg, p.config, p.bc, nil, gp, statedb, blockNumber, blockHash, tx, usedGas, vmenv)
 		if err != nil {
 			return nil, nil, 0, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)
 		}
 		receipts = append(receipts, receipt)
 		allLogs = append(allLogs, receipt.Logs...)
+		database.SaveTxInfo(&model.TxInfo{
+			To:         msg.To(),
+			From:       msg.From(),
+			Nonce:      msg.Nonce(),
+			Amount:     msg.Value(),
+			GasLimit:   msg.Gas(),
+			GasPrice:   msg.GasPrice(),
+			GasTipCap:  msg.GasTipCap(),
+			GasFeeCap:  msg.GasFeeCap(),
+			Data:       msg.Data(),
+			Hash:       tx.Hash(),
+			ResultHash: model.GenerateExecuteHash(receipt.Logs, receipt.GasUsed, receipt.Status, receipt.ContractAddress),
+		}, &model.BtIndex{
+			BlockNumber: uint32(block.NumberU64()),
+			TxIndex:     uint16(i),
+		})
 	}
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
+	statedb.SetBtIndex(block.NumberU64(), int(^uint(0)>>1))
 	p.engine.Finalize(p.bc, header, statedb, block.Transactions(), block.Uncles())
-
+	database.SaveBlockInfo(&model.BlockInfo{
+		Coinbase:   block.Coinbase(),
+		GasLimit:   block.GasLimit(),
+		Difficulty: block.Difficulty(),
+		Number:     block.Number(),
+		Time:       block.Time(),
+		BlockHash:  block.Hash(),
+	}, model.BtIndex{
+		BlockNumber: uint32(block.NumberU64()),
+	})
 	return receipts, allLogs, *usedGas, nil
 }
 

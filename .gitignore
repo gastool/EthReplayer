@@ -14,7 +14,8 @@
 */**/*tx_database*
 */**/*dapps*
 build/_vendor/pkg
-
+config.json
+*_test.go
 #*
 .#*
 *#

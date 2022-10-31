@@ -19,6 +19,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/ethereum/go-ethereum/cmd/evm/replay"
 	"math/big"
 	"os"
 
@@ -222,6 +223,7 @@ func init() {
 		stateTransitionCommand,
 		transactionCommand,
 		blockBuilderCommand,
+		replay.ReplayCommand,
 	}
 	cli.CommandHelpTemplate = flags.OriginCommandHelpTemplate
 }

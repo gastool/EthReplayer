@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum/research/database"
 	"os"
 	"runtime"
 	"strconv"
@@ -222,6 +223,7 @@ func importChain(ctx *cli.Context) error {
 	if len(ctx.Args()) < 1 {
 		utils.Fatalf("This command requires an argument.")
 	}
+	database.Init()
 	// Start metrics export if enabled
 	utils.SetupMetrics(ctx)
 	// Start system runtime metrics collection
