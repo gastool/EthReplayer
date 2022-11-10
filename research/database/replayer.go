@@ -33,13 +33,14 @@ func GetReplayCount(bt model.BtIndex, addrHash common.Hash) uint32 {
 }
 
 func GetStateAccount(bt model.BtIndex, addr common.Address) (s *types.StateAccount) {
-	defer func() {
-		if Debug {
-			log.Info("debug account", "addr", addr, "state", s)
-		}
-	}()
 	var find bool
 	var state model.AccountState
+	defer func() {
+		if Debug {
+			log.Info("debug account", "addr", addr, "state", "nonce", state.Nonce, "balance", state.Balance,
+				"codeHash", hex.EncodeToString(s.CodeHash), "deleted", state.Deleted)
+		}
+	}()
 	err := DataBases[Account].View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(addr[:])
 		if b != nil {
@@ -104,7 +105,7 @@ func GetTxInfo(bt model.BtIndex) *model.TxInfo {
 	return info
 }
 
-func GetStorage(bt model.BtIndex, addrHash common.Hash, search bool) map[common.Hash]common.Hash {
+func GetStorage(bt model.BtIndex, addrHash common.Hash, search bool) (s map[common.Hash]common.Hash) {
 	storage := make(map[common.Hash]common.Hash)
 	sk2 := bt.ToSearchKey(nil)
 	if !search {
@@ -117,6 +118,11 @@ func GetStorage(bt model.BtIndex, addrHash common.Hash, search bool) map[common.
 		binary.LittleEndian.PutUint32(bs, redeployIndex)
 		storageAddr = crypto.Keccak256Hash(addrHash[:], bs)
 	}
+	defer func() {
+		if Debug {
+			log.Info("debug storage", "addrHash", addrHash, "storage", s, "redeployIndex", redeployIndex)
+		}
+	}()
 	err := DataBases[Storage].View(func(tx *bbolt.Tx) error {
 		b2 := tx.Bucket(storageAddr[:])
 		if b2 != nil {
@@ -140,26 +146,26 @@ func GetStorage(bt model.BtIndex, addrHash common.Hash, search bool) map[common.
 }
 
 func GetStorageValue(bt model.BtIndex, addrHash common.Hash, key []byte) (v []byte) {
-	defer func() {
-		if Debug {
-			log.Info("debug storage", "key", hex.EncodeToString(key), "value", hex.EncodeToString(v),
-				"addrHash", addrHash)
-		}
-	}()
 	sk2 := bt.ToSearchKey(nil)
 	key2 := common.TrimLeftZeroes(key)
 	if len(key2) == 0 {
 		key2 = []byte{0}
 	}
 	var value []byte
-	DataBases[Storage].View(func(tx *bbolt.Tx) error {
-		var storageAddr = addrHash
-		redeployIndex := GetReplayCount(bt, addrHash)
-		if redeployIndex > 0 {
-			bs := make([]byte, 4)
-			binary.LittleEndian.PutUint32(bs, redeployIndex)
-			storageAddr = crypto.Keccak256Hash(addrHash[:], bs)
+	var storageAddr = addrHash
+	redeployIndex := GetReplayCount(bt, addrHash)
+	if redeployIndex > 0 {
+		bs := make([]byte, 4)
+		binary.LittleEndian.PutUint32(bs, redeployIndex)
+		storageAddr = crypto.Keccak256Hash(addrHash[:], bs)
+	}
+	defer func() {
+		if Debug {
+			log.Info("debug storage", "key", hex.EncodeToString(key), "value", hex.EncodeToString(v),
+				"addrHash", addrHash, "redeployIndex", redeployIndex)
 		}
+	}()
+	DataBases[Storage].View(func(tx *bbolt.Tx) error {
 		b2 := tx.Bucket(storageAddr[:])
 		if b2 != nil {
 			b3 := b2.Bucket(key2)
