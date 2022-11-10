@@ -37,7 +37,7 @@ func GetStateAccount(bt model.BtIndex, addr common.Address) (s *types.StateAccou
 	var state model.AccountState
 	defer func() {
 		if Debug {
-			log.Info("debug account", "addr", addr, "state", "nonce", state.Nonce, "balance", state.Balance,
+			log.Info("debug account", "addr", addr, "nonce", state.Nonce, "balance", state.Balance,
 				"codeHash", hex.EncodeToString(s.CodeHash), "deleted", state.Deleted)
 		}
 	}()
