@@ -2,8 +2,10 @@ package database
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/research/bbolt"
 	"github.com/ethereum/go-ethereum/research/model"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -43,8 +45,9 @@ func SaveTxInfo(info *model.TxInfo, index *model.BtIndex) {
 		panic(err)
 	}
 	key := index.ToByte()
+	atomic.AddInt64(&saveTask, 1)
+
 	go func() {
-		atomic.AddInt64(&saveTask, 1)
 		defer atomic.AddInt64(&saveTask, -1)
 		err = DataBases[Info].Batch(func(tx *bbolt.Tx) error {
 			c := tx.Bucket([]byte("tx"))
@@ -65,8 +68,8 @@ func SaveBlockInfo(info *model.BlockInfo, index model.BtIndex) {
 		panic(err)
 	}
 	key := index.BlockToByte()
+	atomic.AddInt64(&saveTask, 1)
 	go func() {
-		atomic.AddInt64(&saveTask, 1)
 		defer atomic.AddInt64(&saveTask, -1)
 		e := DataBases[Info].Batch(func(tx *bbolt.Tx) error {
 			c := tx.Bucket([]byte("block"))
@@ -87,8 +90,8 @@ func SaveAccountState(state *model.AccountState, addr common.Address, index mode
 		panic(err)
 	}
 	key := index.ToSortKey(nil)
+	atomic.AddInt64(&saveTask, 1)
 	go func() {
-		atomic.AddInt64(&saveTask, 1)
 		defer atomic.AddInt64(&saveTask, -1)
 		err = DataBases[Account].Batch(func(tx *bbolt.Tx) error {
 			c, err := tx.CreateBucketIfNotExists(addr.Bytes())
@@ -104,11 +107,18 @@ func SaveAccountState(state *model.AccountState, addr common.Address, index mode
 }
 
 func SaveCode(code []byte, codeHash []byte, addrHash common.Hash, bt model.BtIndex) {
-	if ReplayMode || len(code) == 0 {
+	if ReplayMode {
+		if Debug {
+			log.Info("debug code", "code", hex.EncodeToString(code),
+				"codeHash", hex.EncodeToString(code), "addrHash", addrHash)
+		}
 		return
 	}
+	if len(code) == 0 {
+		return
+	}
+	atomic.AddInt64(&saveTask, 1)
 	go func() {
-		atomic.AddInt64(&saveTask, 1)
 		defer atomic.AddInt64(&saveTask, -1)
 		err := DataBases[Code].Batch(func(tx *bbolt.Tx) error {
 			c := tx.Bucket([]byte("code"))
@@ -124,8 +134,8 @@ func SaveCode(code []byte, codeHash []byte, addrHash common.Hash, bt model.BtInd
 			Redeploy: true,
 		}
 		ch, _ := rlp.EncodeToBytes(change)
+		atomic.AddInt64(&saveTask, 1)
 		go func() {
-			atomic.AddInt64(&saveTask, 1)
 			defer atomic.AddInt64(&saveTask, -1)
 			DataBases[CodeChange].Batch(func(tx *bbolt.Tx) error {
 				c := tx.Bucket(addrHash.Bytes())
@@ -139,6 +149,9 @@ func SaveCode(code []byte, codeHash []byte, addrHash common.Hash, bt model.BtInd
 
 func Suicide(addrHash common.Hash, bt model.BtIndex) {
 	if ReplayMode {
+		if Debug {
+			log.Info("debug suicide", "addrHash", addrHash)
+		}
 		return
 	}
 	change := &model.CodeChange{
@@ -146,8 +159,8 @@ func Suicide(addrHash common.Hash, bt model.BtIndex) {
 		Redeploy: false,
 	}
 	ch, _ := rlp.EncodeToBytes(change)
+	atomic.AddInt64(&saveTask, 1)
 	go func() {
-		atomic.AddInt64(&saveTask, 1)
 		defer atomic.AddInt64(&saveTask, -1)
 		DataBases[CodeChange].Batch(func(tx *bbolt.Tx) error {
 			c, _ := tx.CreateBucketIfNotExists(addrHash.Bytes())
@@ -167,8 +180,8 @@ func SaveStorage(storageChange map[common.Hash]common.Hash, addrHash common.Hash
 	if v, ok := Redeploy.Load(addrHash); ok {
 		redeployCount = v.(uint32)
 	}
+	atomic.AddInt64(&saveTask, 1)
 	go func() {
-		atomic.AddInt64(&saveTask, 1)
 		defer atomic.AddInt64(&saveTask, -1)
 		err := DataBases[Storage].Batch(func(tx *bbolt.Tx) error {
 			storageAddr := addrHash
