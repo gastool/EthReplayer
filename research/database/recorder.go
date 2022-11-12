@@ -25,7 +25,10 @@ func InitRedeploy() {
 			redeployIndex := uint32(0)
 			for k, v := c.Cursor().First(); k != nil; k, v = c.Cursor().Next() {
 				var change model.CodeChange
-				rlp.DecodeBytes(v, &change)
+				err := rlp.DecodeBytes(v, &change)
+				if err != nil {
+					panic(err)
+				}
 				if change.Redeploy {
 					redeployIndex++
 				}
@@ -135,11 +138,12 @@ func SaveCode(code []byte, codeHash []byte, addrHash common.Hash, bt model.BtInd
 		}
 		ch, _ := rlp.EncodeToBytes(change)
 		atomic.AddInt64(&saveTask, 1)
+		key := bt.ToByte()
 		go func() {
 			defer atomic.AddInt64(&saveTask, -1)
 			DataBases[CodeChange].Batch(func(tx *bbolt.Tx) error {
 				c := tx.Bucket(addrHash.Bytes())
-				return c.Put(bt.ToByte(), ch)
+				return c.Put(key, ch)
 			})
 		}()
 		vv := v.(uint32) + 1
@@ -159,12 +163,13 @@ func Suicide(addrHash common.Hash, bt model.BtIndex) {
 		Redeploy: false,
 	}
 	ch, _ := rlp.EncodeToBytes(change)
+	key := bt.ToByte()
 	atomic.AddInt64(&saveTask, 1)
 	go func() {
 		defer atomic.AddInt64(&saveTask, -1)
 		DataBases[CodeChange].Batch(func(tx *bbolt.Tx) error {
 			c, _ := tx.CreateBucketIfNotExists(addrHash.Bytes())
-			return c.Put(bt.ToByte(), ch)
+			return c.Put(key, ch)
 		})
 	}()
 	if _, ok := Redeploy.Load(addrHash); !ok {
