@@ -21,9 +21,9 @@ func InitRedeploy() {
 	DataBases[CodeChange].View(func(tx *bbolt.Tx) error {
 		cur := tx.Cursor()
 		for k0, _ := cur.First(); k0 != nil; k0, _ = cur.Next() {
-			c := tx.Bucket(k0)
+			c := tx.Bucket(k0).Cursor()
 			redeployIndex := uint32(0)
-			for k, v := c.Cursor().First(); k != nil; k, v = c.Cursor().Next() {
+			for k, v := c.First(); k != nil; k, v = c.Next() {
 				var change model.CodeChange
 				err := rlp.DecodeBytes(v, &change)
 				if err != nil {

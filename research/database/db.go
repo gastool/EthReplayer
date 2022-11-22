@@ -102,8 +102,8 @@ func Close() {
 	for {
 		tn := atomic.LoadInt64(&saveTask)
 		if tn > 0 {
-			log.Info("database closing", "dbTask", tn)
-			time.Sleep(10 * time.Second)
+			log.Info("database closing", "saveTask=", tn)
+			time.Sleep(30 * time.Second)
 		} else {
 			break
 		}
@@ -113,7 +113,6 @@ func Close() {
 		v.Close()
 	}
 	log.Info("database closed")
-	//pprof.StopCPUProfile()
 }
 
 const (

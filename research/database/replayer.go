@@ -18,8 +18,8 @@ func GetReplayCount(bt model.BtIndex, addrHash common.Hash) uint32 {
 	redeployIndex := uint32(0)
 	if _, ok := Redeploy.Load(addrHash); ok {
 		DataBases[CodeChange].View(func(tx *bbolt.Tx) error {
-			c := tx.Bucket(addrHash[:])
-			for k, v := c.Cursor().First(); k != nil && bytes.Compare(k, bt.ToByte()) <= 0; k, v = c.Cursor().Next() {
+			c := tx.Bucket(addrHash[:]).Cursor()
+			for k, v := c.First(); k != nil && bytes.Compare(k, bt.ToByte()) <= 0; k, v = c.Next() {
 				var change model.CodeChange
 				rlp.DecodeBytes(v, &change)
 				if change.Redeploy {
