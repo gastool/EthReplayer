@@ -17,6 +17,14 @@ var saveTask = int64(0)
 
 var Redeploy = &sync.Map{}
 
+func wait() {
+	for {
+		if atomic.LoadInt64(&saveTask) < 2*int64(MaxBatchSize) {
+			break
+		}
+	}
+}
+
 func InitRedeploy() {
 	DataBases[CodeChange].View(func(tx *bbolt.Tx) error {
 		cur := tx.Cursor()
@@ -48,8 +56,8 @@ func SaveTxInfo(info *model.TxInfo, index *model.BtIndex) {
 		panic(err)
 	}
 	key := index.ToByte()
+	wait()
 	atomic.AddInt64(&saveTask, 1)
-
 	go func() {
 		defer atomic.AddInt64(&saveTask, -1)
 		err = DataBases[Info].Batch(func(tx *bbolt.Tx) error {
@@ -71,6 +79,7 @@ func SaveBlockInfo(info *model.BlockInfo, index model.BtIndex) {
 		panic(err)
 	}
 	key := index.BlockToByte()
+	wait()
 	atomic.AddInt64(&saveTask, 1)
 	go func() {
 		defer atomic.AddInt64(&saveTask, -1)
@@ -93,6 +102,7 @@ func SaveAccountState(state *model.AccountState, addr common.Address, index mode
 		panic(err)
 	}
 	key := index.ToSortKey(nil)
+	wait()
 	atomic.AddInt64(&saveTask, 1)
 	go func() {
 		defer atomic.AddInt64(&saveTask, -1)
@@ -120,6 +130,7 @@ func SaveCode(code []byte, codeHash []byte, addrHash common.Hash, bt model.BtInd
 	if len(code) == 0 {
 		return
 	}
+	wait()
 	atomic.AddInt64(&saveTask, 1)
 	go func() {
 		defer atomic.AddInt64(&saveTask, -1)
@@ -137,6 +148,7 @@ func SaveCode(code []byte, codeHash []byte, addrHash common.Hash, bt model.BtInd
 			Redeploy: true,
 		}
 		ch, _ := rlp.EncodeToBytes(change)
+		wait()
 		atomic.AddInt64(&saveTask, 1)
 		key := bt.ToByte()
 		go func() {
@@ -164,6 +176,7 @@ func Suicide(addrHash common.Hash, bt model.BtIndex) {
 	}
 	ch, _ := rlp.EncodeToBytes(change)
 	key := bt.ToByte()
+	wait()
 	atomic.AddInt64(&saveTask, 1)
 	go func() {
 		defer atomic.AddInt64(&saveTask, -1)
@@ -185,6 +198,7 @@ func SaveStorage(storageChange map[common.Hash]common.Hash, addrHash common.Hash
 	if v, ok := Redeploy.Load(addrHash); ok {
 		redeployCount = v.(uint32)
 	}
+	wait()
 	atomic.AddInt64(&saveTask, 1)
 	go func() {
 		defer atomic.AddInt64(&saveTask, -1)
