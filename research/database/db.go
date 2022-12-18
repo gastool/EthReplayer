@@ -34,8 +34,8 @@ type DBConfig struct {
 var ReplayMode bool
 
 var Debug bool
-var MaxBatchDelay = 1 * time.Second
-var MaxBatchSize = 100000
+var MaxBatchDelay = 60 * time.Second
+var MaxBatchSize = 1000000
 
 func Init() {
 	var e error

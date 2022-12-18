@@ -19,7 +19,7 @@ var Redeploy = &sync.Map{}
 
 func wait() {
 	for {
-		if atomic.LoadInt64(&saveTask) < 2*int64(MaxBatchSize) {
+		if atomic.LoadInt64(&saveTask) < 10*int64(MaxBatchSize) {
 			break
 		}
 	}
