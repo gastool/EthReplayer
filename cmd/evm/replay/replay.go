@@ -44,9 +44,6 @@ func replayCmd(ctx *cli.Context) error {
 		replayAllTx()
 		return nil
 	}
-	if len(ctx.Args()) != 2 {
-		return errors.New("invalid blockNumber or txIndex")
-	}
 	p1, _ := strconv.Atoi(ctx.Args()[0])
 	p2, _ := strconv.Atoi(ctx.Args()[1])
 	if rangeReplay {
