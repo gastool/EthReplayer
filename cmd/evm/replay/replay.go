@@ -50,9 +50,18 @@ func replayCmd(ctx *cli.Context) error {
 	p1, _ := strconv.Atoi(ctx.Args()[0])
 	p2, _ := strconv.Atoi(ctx.Args()[1])
 	if rangeReplay {
-		return replayRange(p1, p2)
+		if len(ctx.Args())%2 != 0 {
+			return errors.New("invalid block range")
+		}
+		for i := 0; i < len(ctx.Args())-1; i = i + 2 {
+			p1, _ = strconv.Atoi(ctx.Args()[i])
+			p2, _ = strconv.Atoi(ctx.Args()[i+1])
+			replayRange(p1, p2)
+		}
+		return nil
+	} else {
+		return Replay(uint64(p1), p2)
 	}
-	return Replay(uint64(p1), p2)
 }
 
 func replayAllTx() {
@@ -157,7 +166,8 @@ func replayRange(bs int, be int) error {
 				if lb2 > lb {
 					elapsed := time.Since(last).Seconds()
 					last = time.Now()
-					fmt.Printf("elapsed time: %v, number = %v\n", time.Since(start).Round(time.Millisecond), bt.BlockNumber)
+					d := time.Since(start)
+					fmt.Printf("elapsed time: %v, blk  = %v, tx =%v,elapsed millisecond=%v  \n", d.Round(time.Millisecond), bt.BlockNumber, txSum, d.Milliseconds())
 					fmt.Printf("%.2f blk/s   %.2f tx/s\n", float64(blockSum)/elapsed, float64(txSum)/elapsed)
 					txSum = 0
 					blockSum = 0
@@ -173,7 +183,8 @@ func replayRange(bs int, be int) error {
 		return nil
 	})
 	wp.StopWait()
-	fmt.Println("cost time:", time.Since(start).Round(time.Millisecond))
+	d := time.Since(start)
+	fmt.Println("cost time:", d.Round(time.Millisecond), d.Milliseconds())
 	fmt.Printf("\nall tx:%d", sum)
 	return err
 }
