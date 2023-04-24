@@ -88,6 +88,11 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 		}
 		receipts = append(receipts, receipt)
 		allLogs = append(allLogs, receipt.Logs...)
+		acl := msg.AccessList()
+		aclP := &acl
+		if len(acl) == 0 {
+			aclP = nil
+		}
 		database.SaveTxInfo(&model.TxInfo{
 			To:         msg.To(),
 			From:       msg.From(),
@@ -99,6 +104,8 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 			GasFeeCap:  msg.GasFeeCap(),
 			Data:       msg.Data(),
 			Hash:       tx.Hash(),
+			IsFake:     msg.IsFake(),
+			AccessList: aclP,
 			ResultHash: model.GenerateExecuteHash(receipt.Logs, receipt.GasUsed, receipt.Status, receipt.ContractAddress),
 		}, &model.BtIndex{
 			BlockNumber: uint32(block.NumberU64()),
@@ -115,6 +122,8 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 		Number:     block.Number(),
 		Time:       block.Time(),
 		BlockHash:  block.Hash(),
+		Random:     blockContext.Random,
+		BaseFee:    blockContext.BaseFee,
 	}, model.BtIndex{
 		BlockNumber: uint32(block.NumberU64()),
 	})

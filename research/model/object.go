@@ -23,6 +23,8 @@ type TxInfo struct {
 	GasTipCap  *big.Int `rlp:"nil"`
 	GasFeeCap  *big.Int `rlp:"nil"`
 	Data       []byte
+	IsFake     bool
+	AccessList *types.AccessList
 	Hash       common.Hash
 	ResultHash common.Hash
 }
@@ -34,6 +36,8 @@ type BlockInfo struct {
 	Number     *big.Int
 	Time       uint64
 	BlockHash  common.Hash
+	BaseFee    *big.Int
+	Random     *common.Hash
 }
 
 type CodeChange struct {
