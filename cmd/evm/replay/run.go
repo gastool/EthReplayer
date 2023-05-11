@@ -72,6 +72,7 @@ func Replay(block uint64, txIndex int) error {
 	be := database.GetBlockInfo(bt)
 	txInfo := database.GetTxInfo(bt)
 	if be == nil || txInfo == nil {
+		log.Println(be, txInfo)
 		//log.Printf("invalid blockNumber:%d or tx:%d", block, txIndex)
 		return fmt.Errorf("invalid blockNumber:%d or tx:%d", block, txIndex)
 	}
