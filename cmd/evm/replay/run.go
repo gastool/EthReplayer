@@ -98,6 +98,7 @@ func Replay(block uint64, txIndex int) error {
 	result, err := core.ApplyMessage(evm, msg, gaspool)
 	if err != nil {
 		log.Println("[error]", block, txIndex, err)
+		return err
 	}
 	status := uint64(0)
 	if result.Failed() {
