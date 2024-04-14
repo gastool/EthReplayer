@@ -1,7 +1,7 @@
 # Ethereum Transaction Replay Tool
 
 ## Introduction
-This project enhances Ethereum transaction processing efficiency through a restructured database that enables parallel execution of transactions. By optimizing how transactions are handled, the tool aims to meet the increasing demands on Ethereum's network, thus enabling faster and more efficient processing capabilities.
+This project introduces an advanced replay tool for Ethereum, designed to enhance the efficiency of historical transaction analysis through a restructured database that supports parallel execution. The tool focuses on replaying historical Ethereum transactions, optimizing their handling to better meet the analytical demands on Ethereum's network and provide a more effective environment for testing and analysis of smart contracts
 
 ## Environment
 - Golang version >= 1.19.0
