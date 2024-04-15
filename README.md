@@ -54,3 +54,8 @@ In `ReplayerSpace`, create a JSON file to configure the archival database. Examp
 
 ## Note
 This project has been tested up to the first 12 million blocks. Transactions beyond this range have not been experimented with.
+
+## Publication Note
+This work has been accepted for publication by the IEEE Transactions on Services Computing. The citation is as follows:
+
+Y. Huang, R. Wang, X. Chen, and Z. Zheng, "Ethereum Transaction Replay Platform Based on State-wise Account Input Data," IEEE Transactions on Services Computing, accepted for publication.
